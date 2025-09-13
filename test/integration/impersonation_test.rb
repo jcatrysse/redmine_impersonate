@@ -59,6 +59,19 @@ class ImpersonationTest < ActionDispatch::IntegrationTest
     assert_select '#impersonation-bar'
   end
 
+  test "impersonating user requiring twofa works" do
+    log_user('admin', 'admin')
+
+    user = User.find_by_login('jsmith')
+
+    with_settings twofa: '2' do
+      post '/admin/impersonation', params: {user_id: user.id}
+      follow_redirect!
+      assert_equal user, User.find(session[:user_id])
+      assert_nil session[:must_activate_twofa]
+    end
+  end
+
   test "impersonating user as user" do
     log_user('jsmith', 'jsmith')
 

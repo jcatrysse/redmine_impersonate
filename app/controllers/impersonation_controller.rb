@@ -21,6 +21,8 @@ class ImpersonationController < ApplicationController
 
       # Don't require password change of target user
       session.delete(:pwd)
+      # Skip two-factor authentication activation for impersonated user
+      session.delete(:must_activate_twofa)
     end
 
     # Redirect to the home with the new impersonated user
@@ -35,6 +37,6 @@ class ImpersonationController < ApplicationController
       session.delete(:true_user_id)
     end
 
-    redirect_to :back
+    redirect_back fallback_location: home_url
   end
 end
