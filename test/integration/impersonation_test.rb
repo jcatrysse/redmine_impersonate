@@ -30,6 +30,18 @@ class ImpersonationTest < ActionDispatch::IntegrationTest
     assert_select '#impersonate'
   end
 
+  test "impersonate link has an icon" do
+    log_user('admin', 'admin')
+
+    get "/users/#{User.find_by_login('jsmith').id}"
+    if ApplicationController.helpers.respond_to?(:sprite_icon)
+      assert_select '#impersonate svg'
+      assert_select '#impersonate .icon-label', text: l(:button_impersonate)
+    else
+      assert_select '#impersonate.icon-user', text: l(:button_impersonate)
+    end
+  end
+
   test "impersonate link as admin in admin profile" do
     log_user('admin', 'admin')
 
