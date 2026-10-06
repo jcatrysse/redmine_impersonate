@@ -18,7 +18,7 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | Plugin id | `redmine_impersonate` |
 | GEOxyz runs today | `master` |
 | Upstream | nounder/redmine_impersonate master @ 925179f (2024-05-20) |
-| Runs on Redmine 7 as is | DEELS |
+| Runs on Redmine 7 as is | JA (after the test helper fix `1494093`) |
 | Upstream sync | UPSTREAM DOOD |
 | After sync | n.v.t. |
 | Complexity (1 trivial .. 5 rewrite) | 1 |
@@ -28,6 +28,24 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 ## Already on this branch
 
 - `1494093` Silence deprecations through Rails.application.deprecators on Rails 7.1+
+- `5cfa1a7` Impersonate link with a Redmine 7 SVG icon (`sprite_icon`; CSS icon class kept for older versions), with a test
+- `457f3bb` End-to-end scenario `test/e2e/impersonate.mjs`, seed `test/e2e/seed.rb`, screenshots in `docs/e2e/`
+
+## Result of the migration session (2026-10-06, Redmine 7.0.1 `7.0-stable-GEOxyz`, Rails 8.1, Ruby 3.3.6)
+
+| | PostgreSQL 16.15 | MariaDB 10.11.14 |
+|---|---|---|
+| Baseline minitest (before changes) | 10 runs, 28 assertions, 0 failures | 10 runs, 28 assertions, 0 failures |
+| minitest after changes | 11 runs, 33 assertions, 0 failures, 0 errors, 0 skips | 11 runs, 33 assertions, 0 failures, 0 errors, 0 skips |
+| e2e (production mode): smoke / core / impersonate | 10 / 6 / 14 screenshots, 0 problems | 10 / 6 / 14 screenshots, 0 problems (output in a temp dir, same pictures) |
+
+- The new test (`impersonate link has an icon`) fails without the hook change (1 failure seen), passes with it.
+- Migrations: the plugin has none. Boot and eager load are exercised by the production-mode server.
+- Redmine 5.1: not run, the 5.1 core needs Ruby < 3.3 and only 3.3.6 is available here. The change is guarded with `respond_to?(:sprite_icon)` and keeps the old `icon icon-user` class, so it should behave as before on 5.1/6.1. Unverified.
+- Together with other GEOxyz plugins: not run in this session (no other plugin checkout; the plugin touches only its own hook and controller).
+- OpenAI review (`gpt-5`, `docs/reviews/openai-2026-10-06-457f3bb.md`): no findings. My own adversarial read of the diff found nothing further.
+- Webhooks (Redmine 7): the plugin does not hide, add or change issue data, so nothing to make consistent. Note: a webhook fires as the acting user, so while impersonating it is the impersonated user's webhook rules that apply.
+- Not testable here: real 2FA devices (the 2FA path is covered by the existing integration test `impersonating user requiring twofa works`), LDAP/SSO.
 
 ## Work list for the migration session
 
@@ -35,14 +53,14 @@ In this order: things that break, security, the GEOxyz changes, the open items, 
 
 **Open items from the analysis** (Dutch; where they conflict with a decision or a priority item above, those win)
 
-1. Cosmetic: impersonate link has no SVG icon on Redmine 7
-2. Known interplay with redmine_stealth: toggling stealth while impersonating changes the impersonated user's preference
+1. Cosmetic: impersonate link has no SVG icon on Redmine 7 - DONE in `5cfa1a7`, e2e `impersonate-profile-link.png`
+2. Known interplay with redmine_stealth: toggling stealth while impersonating changes the impersonated user's preference - DEFERRED, not fixed: redmine_stealth is not in this repo and impersonation by definition acts as that user, so the preference of the impersonated user is what is written. Workaround: toggle stealth after Cancel. Recorded under "Open questions for Jan".
 
 **Checks**
 
-3. Run the plugin's whole test suite on Redmine 7.0-stable-GEOxyz with PostgreSQL AND MariaDB, and once on 5.1-stable if the branch is meant to stay 5.1-compatible.
-4. Check Redmine 7 webhooks against this plugin (see "Rules"), and note the result here even if nothing is needed.
-5. Verify every feature of the plugin by hand on a running Redmine 7 (screenshots).
+3. (DONE on 7.0-stable-GEOxyz, PostgreSQL and MariaDB; 5.1 not run, see result) Run the plugin's whole test suite on Redmine 7.0-stable-GEOxyz with PostgreSQL AND MariaDB, and once on 5.1-stable if the branch is meant to stay 5.1-compatible.
+4. (DONE, nothing needed) Check Redmine 7 webhooks against this plugin (see "Rules"), and note the result here even if nothing is needed.
+5. (DONE, see inventory) Verify every feature of the plugin by hand on a running Redmine 7 (screenshots).
 
 ## GEOxyz changes to review or re-apply
 
@@ -52,11 +70,33 @@ These GEOxyz commits are on the branch GEOxyz runs today and therefore on this b
 |---|---|---|
 | `845446c` | 2025-09-14 | Patch: fix impersonation issue with 2FA |
 
+Verdict `845446c`: KEEP. The session deletes `must_activate_twofa` after `start_user_session`; Redmine 7 core does not do this for an impersonated session (the existing test `impersonating user requiring twofa works` asserts it and passes on 7.0). Code, README note and test are fine as they are.
+
 ## After the upgrade (production)
 
 Actions the person doing the upgrade must take, or know about, for this plugin:
 
-- None known. Add here what the session finds.
+- None. No migrations, no settings, no data fixes. Sudo mode (on by default in Redmine 7) asks the admin for the password when starting an impersonation, and again after Cancel because the session is renewed; this is expected.
+
+## Inventory of functions
+
+| function | how a user reaches it | scenario | screenshot |
+|---|---|---|---|
+| Impersonate link on profile | admin, /users/:id | `test/e2e/impersonate.mjs` | `docs/e2e/impersonate-profile-link.png` |
+| Impersonate link on edit page | admin, /users/:id/edit | same | `impersonate-edit-link.png` |
+| No link: own profile, locked user, anonymous, non-admin manager | same pages | same | `impersonate-own-profile.png`, `-locked-profile.png`, `-anonymous.png`, `-manager.png` |
+| Start impersonation (POST /admin/impersonation, sudo mode) | click the link | same | `impersonate-sudo.png`, `impersonate-impersonating.png` |
+| Impersonation bar and Cancel (DELETE /admin/impersonation) | red bar on every page | same | `impersonate-impersonating.png`, `impersonate-cancelled.png` |
+| Impersonated user keeps own permissions (no admin, private project hidden) | while impersonating | same | `impersonate-no-admin-while-impersonating.png`, `-outsider-private.png`, `-outsider-public.png` |
+| Refusals: nested POST as non-admin 403, locked or unknown user 404, session stays admin | POST | same | `impersonate-nested-refused.png`, `-failures-keep-admin.png` |
+| 2FA activation skipped for the impersonated user | integration test only (needs a real 2FA setup) | `test/integration/impersonation_test.rb` | n.a. |
+| Hook on the people plugin page (`view_people_show_details_bottom`) | redmine_people only | not testable, plugin not installed | n.a. |
+| Mail, REST API, rake, cron, macros, settings | none exist | n.a. | n.a. |
+
+## Open questions for Jan
+
+1. redmine_stealth interplay (toggle while impersonating changes the impersonated user's preference). Options: (a) leave as is and tell admins to toggle after Cancel (chosen, no behaviour lost); (b) have the plugin block preference writes of the real admin's stealth while impersonating, which needs a change in redmine_stealth. Recommendation: (a).
+2. Redmine 5.1 and the other GEOxyz plugins in combination were not run here (Ruby 3.3 only, no other plugin checkouts). Run the manual GitHub workflow with 5.1-stable if the branch must stay 5.1-compatible.
 
 ## How to test
 
