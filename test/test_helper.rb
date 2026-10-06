@@ -17,7 +17,11 @@ require File.expand_path(File.dirname(__FILE__) + '/../../../test/test_helper')
 require 'ostruct'
 
 # Avoid deprecation noise during test runs
-ActiveSupport::Deprecation.behavior = :silence
+if Rails.application.respond_to?(:deprecators)
+  Rails.application.deprecators.behavior = :silence
+else
+  ActiveSupport::Deprecation.behavior = :silence
+end
 
 # Required for certain Redmine helpers in Ruby 3
 require 'ostruct'
