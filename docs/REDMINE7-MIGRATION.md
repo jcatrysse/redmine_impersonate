@@ -54,7 +54,7 @@ In this order: things that break, security, the GEOxyz changes, the open items, 
 **Open items from the analysis** (Dutch; where they conflict with a decision or a priority item above, those win)
 
 1. Cosmetic: impersonate link has no SVG icon on Redmine 7 - DONE in `5cfa1a7`, e2e `impersonate-profile-link.png`
-2. Known interplay with redmine_stealth: toggling stealth while impersonating changes the impersonated user's preference - DEFERRED, not fixed: redmine_stealth is not in this repo and impersonation by definition acts as that user, so the preference of the impersonated user is what is written. Workaround: toggle stealth after Cancel. Recorded under "Open questions for Jan".
+2. Known interplay with redmine_stealth: toggling stealth while impersonating changes the impersonated user's preference - DECIDED (Jan, 2026-10-07): leave as is, toggle after Cancel. Reasoning at the time: redmine_stealth is not in this repo and impersonation by definition acts as that user, so the preference of the impersonated user is what is written. Workaround: toggle stealth after Cancel. See "Decided by Jan".
 
 **Checks**
 
@@ -93,10 +93,20 @@ Actions the person doing the upgrade must take, or know about, for this plugin:
 | Hook on the people plugin page (`view_people_show_details_bottom`) | redmine_people only | not testable, plugin not installed | n.a. |
 | Mail, REST API, rake, cron, macros, settings | none exist | n.a. | n.a. |
 
-## Open questions for Jan
+## Decided by Jan (2026-10-07)
 
-1. redmine_stealth interplay (toggle while impersonating changes the impersonated user's preference). Options: (a) leave as is and tell admins to toggle after Cancel (chosen, no behaviour lost); (b) have the plugin block preference writes of the real admin's stealth while impersonating, which needs a change in redmine_stealth. Recommendation: (a).
-2. Redmine 5.1 and the other GEOxyz plugins in combination were not run here (Ruby 3.3 only, no other plugin checkouts). Run the manual GitHub workflow with 5.1-stable if the branch must stay 5.1-compatible.
+Full text: [docs/DECISIONS-2026-10-07.md](DECISIONS-2026-10-07.md). Final.
+
+General, for every GEOxyz plugin:
+- Straight to Redmine 7, no backports to 5.1; 5.1 compatibility is no longer a requirement and no code path exists only for 5.1.
+- Production runs PostgreSQL 16: tests and e2e on PostgreSQL only; a MariaDB-only problem is a note, not a blocker.
+- deface without version constraint (this plugin has no Gemfile: n.a.).
+- Core methods that other plugins patch: `prepend`, never `alias_method`. Checked: this plugin patches no core method. The only `alias_method` is on its own hook listener (`view_account_left_bottom`, `view_users_form`), so nothing to change. Not run together with the other GEOxyz plugins (`RMP_EXTRA_PLUGINS`, no repository URLs known to this session); open for the coordinator.
+- GitHub Actions manual only.
+
+Plugin decision redmine_impersonate-q1 (stealth toggled while impersonating changes the impersonated user's preference): Jan chose A, "Zo laten, stealth omschakelen na Cancel". No code; admins must toggle stealth after Cancel. Jan's note: "zelfde als stealth 4, Jan koos 'zo accepteren'". Recorded, nothing to build.
+
+The earlier MariaDB and 5.1 remarks in "Result of the migration session" are historical; MariaDB passed (11 runs, 0 failures; e2e 0 problems), 5.1 was never run and no longer needs to be.
 
 ## How to test
 
@@ -207,7 +217,7 @@ results quoted in the analysis come from it.
   (on by default: `t.sudo()` in a scenario). The breaker list is in the migration kit's CHECKLIST.md.
 - **Locales**: keep the locales the plugin ships in sync; translate a new key by matching the
   closest existing key in the same file, not from scratch; do not add new languages.
-- **5.1 compatibility**: prefer fixes that also run on Redmine 5.1 so they can be merged early;
+- **5.1 compatibility**: NOT required (Jan, 2026-10-07). Prefer fixes that also run on Redmine 5.1 only if free;
   say so when a fix cannot.
 - **Git**: work on `redmine70-migration` only; never push to the default branch; never force-push
   a branch someone else uses. Descriptive commit messages (what and why). Push after every
