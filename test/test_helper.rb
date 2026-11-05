@@ -3,9 +3,9 @@ module Warning
   class << self
     alias_method :original_warn, :warn
 
-    def warn(message, *args)
+    def warn(message, *args, **kwargs)
       return if message.to_s.include?("PG::Coder.new(hash) is deprecated")
-      original_warn(message, *args)
+      original_warn(message, *args, **kwargs)
     end
   end
 end
